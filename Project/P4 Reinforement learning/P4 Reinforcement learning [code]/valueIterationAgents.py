@@ -131,6 +131,24 @@ class AsynchronousValueIterationAgent(ValueIterationAgent):
 
     def runValueIteration(self):
         "*** YOUR CODE HERE ***"
+        states = self.mdp.getStates()
+        index = 0
+
+        for i in range(self.iterations):
+            state = states[index]
+
+            if not self.mdp.isTerminal(state):
+                actions = self.mdp.getPossibleActions(state)
+                max_value = float('-inf')
+
+                for action in actions:
+                    q_value = self.computeQValueFromValues(state, action)
+                    if q_value > max_value:
+                        max_value = q_value
+                    
+                self.values[state] = max_value
+            
+            index = (index + 1) % len(states)
 
 class PrioritizedSweepingValueIterationAgent(AsynchronousValueIterationAgent):
     """
@@ -151,4 +169,38 @@ class PrioritizedSweepingValueIterationAgent(AsynchronousValueIterationAgent):
 
     def runValueIteration(self):
         "*** YOUR CODE HERE ***"
+        # Step. 1 Compute predecessors of all states
+        predecessors = {} # declare a 'dictionary' type
+
+        for state in self.mdp.getStates():
+            predecessors[state] = set()
+        
+        for state in self.mdp.getStates():
+            for action in self.mdp.getPossibleActions(state):
+                for next_state, prob in self.mdp.getTransitionStatesAndProbs(state, action):
+                    if prob > 0: # Quote: "we define the predecessors of a state s as all states that have a NONZERO ... "
+                        predecessors[next_state].add(state) # If I take action(already instantiated, refer to 2nd loop) in state(already instantiated, refer to 1st loop), I may(with probability > 0) reach next_state. Therefore, by definition, STATE is QUALIFIED as the predecessors of NEXT_STATE. ---> we have to pop STATE to the predecessor list of NEXT_STATE
+                    
+        
+        # Step. 2 Initialize an empty priority queue
+        priority_queue = util.PriorityQueue() # line 205 in util.py has the def.
+
+
+        # Step. 3 For each non-terminal state s ... (looping !)
+        for state in self.mdp.getStates():
+            if not self.mdp.isTerminal(state):
+                diff = abs(self.values[state] - max(self.computeQValueFromValues(state, action) for action in self.mdp.getPossibleActions(state)))
+                priority_queue.push(state, -diff)
+
+        # Step 4. For iteration ...
+        for _ in range(self.iterations):
+            if priority_queue.isEmpty():
+                break
+            state = priority_queue.pop()
+            if not self.mdp.isTerminal(state):
+                self.values[state] = max(self.computeQValueFromValues(state, action) for action in self.mdp.getPossibleActions(state))
+            for predecessor in predecessors[state]:
+                diff = abs(self.values[predecessor] - max(self.computeQValueFromValues(predecessor, action) for action in self.mdp.getPossibleActions(predecessor)))
+                if diff > self.theta:
+                    priority_queue.update(predecessor, -diff)
 
